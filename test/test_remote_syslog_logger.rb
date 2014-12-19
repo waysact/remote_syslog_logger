@@ -25,4 +25,23 @@ class TestRemoteSyslogLogger < Test::Unit::TestCase
     message, addr = *@socket.recvfrom(1024)
     assert_match /This is the second line/, message
   end
+
+  def test_logger_default_tag
+    $0 = 'foo'
+    logger = RemoteSyslogLogger.new('127.0.0.1', @server_port)
+    logger.info ""
+
+    message, addr = *@socket.recvfrom(1024)
+    assert_match "foo[#{$$}]: I,", message
+  end
+
+  def test_logger_long_default_tag
+    $0 = 'x' * 64
+    pid_suffix = "[#{$$}]"
+    logger = RemoteSyslogLogger.new('127.0.0.1', @server_port)
+    logger.info ""
+
+    message, addr = *@socket.recvfrom(1024)
+    assert_match 'x' * (32 - pid_suffix.size) + pid_suffix + ': I,', message
+  end
 end

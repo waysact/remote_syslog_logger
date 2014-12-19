@@ -17,7 +17,13 @@ module RemoteSyslogLogger
 
       @packet.facility = options[:facility] || 'user'
       @packet.severity = options[:severity] || 'notice'
-      @packet.tag      = options[:program]  || "#{File.basename($0)}[#{$$}]"
+      @packet.tag      = options[:program]  || default_tag
+    end
+
+    def default_tag
+      pid_suffix = "[#{$$}]"
+      max_basename_size = 32 - pid_suffix.size
+      "#{File.basename($0)}"[0...max_basename_size].gsub(/[^\x21-\x7E]/, '_') + pid_suffix
     end
     
     def transmit(message)
