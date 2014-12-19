@@ -7,7 +7,9 @@ module RemoteSyslogLogger
       @remote_hostname = remote_hostname
       @remote_port     = remote_port
       @whinyerrors     = options[:whinyerrors]
-      
+      @max_packet_size = options[:max_packet_size] || 1024
+      @continuation_prefix = options[:continuation_prefix] || '... '
+
       @socket = UDPSocket.new
       @packet = SyslogProtocol::Packet.new
 
@@ -31,8 +33,16 @@ module RemoteSyslogLogger
         begin
           next if line =~ /^\s*$/
           packet = @packet.dup
-          packet.content = line
-          @socket.send(packet.assemble, 0, @remote_hostname, @remote_port)
+          max_content_size = @max_packet_size - packet.assemble(@max_packet_size).size
+          offset = 0
+          line_prefix = ''
+          while offset < line.size
+            chunk_size = max_content_size - line_prefix.size
+            packet.content = line_prefix + line[offset...offset+chunk_size]
+            @socket.send(packet.assemble(@max_packet_size), 0, @remote_hostname, @remote_port)
+            offset += chunk_size
+            line_prefix = @continuation_prefix
+          end
         rescue
           $stderr.puts "#{self.class} error: #{$!.class}: #{$!}\nOriginal message: #{line}"
           raise if @whinyerrors
