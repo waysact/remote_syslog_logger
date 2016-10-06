@@ -1,5 +1,6 @@
 require 'socket'
 require 'syslog_protocol'
+require File.expand_path('../limit_bytesize', __FILE__)
 
 module RemoteSyslogLogger
   class UdpSender
@@ -34,13 +35,14 @@ module RemoteSyslogLogger
           next if line =~ /^\s*$/
           packet = @packet.dup
           max_content_size = @max_packet_size - packet.assemble(@max_packet_size).size
-          offset = 0
           line_prefix = ''
-          while offset < line.size
-            chunk_size = max_content_size - line_prefix.size
-            packet.content = line_prefix + line[offset...offset+chunk_size]
+          remaining_line = line
+          until remaining_line.empty?
+            chunk_byte_size = max_content_size - line_prefix.bytesize
+            chunk = limit_bytesize(remaining_line, chunk_byte_size)
+            packet.content = line_prefix + chunk
             @socket.send(packet.assemble(@max_packet_size), 0, @remote_hostname, @remote_port)
-            offset += chunk_size
+            remaining_line = remaining_line[chunk.size..-1]
             line_prefix = @continuation_prefix
           end
         rescue

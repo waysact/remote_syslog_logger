@@ -1,4 +1,7 @@
+# encoding: utf-8
+
 require File.expand_path('../helper', __FILE__)
+require File.expand_path('../../lib/remote_syslog_logger/limit_bytesize', __FILE__)
 
 class TestRemoteSyslogLogger < MiniTest::Test
   def setup
@@ -49,7 +52,8 @@ class TestRemoteSyslogLogger < MiniTest::Test
   TEST_HOSTNAME = 'bar'
   TEST_FACILITY = 'user'
   TEST_SEVERITY = 'notice'
-  TEST_MESSAGE = "abcdefg" * 512
+  TEST_MESSAGE = "abcdefg✓" * 512
+  TEST_MESSAGE_ASCII8 = "abcdefg".force_encoding('ASCII')
 
   def test_logger_long_message
     _test_msg_splitting_with(
@@ -84,6 +88,28 @@ class TestRemoteSyslogLogger < MiniTest::Test
       continuation_prefix: 'frobnicate')
   end
 
+  def test_logger_ascii8_message
+    _test_msg_splitting_with(
+      tag: TEST_TAG,
+      hostname: TEST_HOSTNAME,
+      severity: TEST_SEVERITY,
+      facility: TEST_FACILITY,
+      message: TEST_MESSAGE_ASCII8,
+      max_packet_size: nil,
+      continuation_prefix: nil)
+  end
+
+  def test_logger_empty_message
+    _test_msg_splitting_with(
+      tag: TEST_TAG,
+      hostname: TEST_HOSTNAME,
+      severity: TEST_SEVERITY,
+      facility: TEST_FACILITY,
+      message: '',
+      max_packet_size: nil,
+      continuation_prefix: nil)
+  end
+
   private
 
   class MessageOnlyFormatter < ::Logger::Formatter
@@ -114,14 +140,21 @@ class TestRemoteSyslogLogger < MiniTest::Test
     test_packet.content = ''
     max_content_size = packet_size - test_packet.assemble.size
 
-    offset = 0
     line_prefix = ''
-    while offset < options[:message].size
-      chunk_size = max_content_size - line_prefix.size
-      message, addr = *@socket.recvfrom(packet_size * 2)
-      assert_match Regexp.new(': ' + line_prefix + Regexp.escape(options[:message][offset...offset + chunk_size]) + '$'), message
-      offset += chunk_size
+    remaining_message = options[:message]
+    reassembled_message = ''
+    until remaining_message.empty?
+      chunk_size = max_content_size - line_prefix.bytesize
+      chunk = limit_bytesize(remaining_message, chunk_size)
+      message, = *@socket.recvfrom(packet_size * 2)
+      message.force_encoding('UTF-8')
+      match = Regexp.new(
+        ': ' + line_prefix + '(' + Regexp.escape(chunk) + ')$').match(message)
+      assert !match.nil?
+      reassembled_message += match[1]
+      remaining_message = remaining_message[chunk.size..-1]
       line_prefix = continuation_prefix
     end
+    assert_equal(reassembled_message, options[:message])
   end
 end
