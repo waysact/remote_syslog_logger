@@ -50,6 +50,9 @@ Gem::Specification.new do |s|
   ## that are needed for an end user to actually USE your code.
   s.add_dependency('syslog_protocol')
 
+  s.add_development_dependency('rake')
+  s.add_development_dependency('test-unit')
+
   ## List your development dependencies here. Development dependencies are
   ## those that are only needed during development
   # s.add_development_dependency('DEVDEPNAME', [">= 1.1.0", "< 2.0.0"])

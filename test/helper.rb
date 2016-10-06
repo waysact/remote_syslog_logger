@@ -9,4 +9,4 @@ end
 
 require 'remote_syslog_logger'
 
-require 'test/unit'
+require 'minitest/autorun'

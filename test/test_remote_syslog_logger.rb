@@ -1,6 +1,6 @@
 require File.expand_path('../helper', __FILE__)
 
-class TestRemoteSyslogLogger < Test::Unit::TestCase
+class TestRemoteSyslogLogger < MiniTest::Test
   def setup
     @server_port = rand(50000) + 1024
     @socket = UDPSocket.new
